@@ -8,7 +8,6 @@ import 'dart:math';
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
-import 'package:scrollable_positioned_list/src/scroll_position_keeper.dart';
 
 import 'item_positions_listener.dart';
 import 'item_positions_notifier.dart';
@@ -174,8 +173,9 @@ class ScrollablePositionedList extends StatefulWidget {
   /// cache extent.
   final double? minCacheExtent;
 
-  /// [ScrollPositionKeeper] keeping item with not scroll when insert data in header
-  final ScrollPositionKeeper? scrollPositionKeeper;
+  /// [scrollPositionKeeper] Keeping item with not scroll when insert data in header
+  /// enter [LocalKey] for each item
+  final LocalKey Function(int index)? scrollPositionKeeper;
 
   @override
   State<StatefulWidget> createState() => _ScrollablePositionedListState();
@@ -335,33 +335,30 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
       }
     }
 
-    if (widget.scrollPositionKeeper != null && _lastTargetKey != null) {
-      final currentTargetIndex = _getIndexOfKey(widget.scrollPositionKeeper!);
-      if (currentTargetIndex != null && currentTargetIndex > primary.target) {
-        primary.target = currentTargetIndex;
+    if (widget.scrollPositionKeeper != null && _firstItemKey != null) {
+      int? storedItemIndex;
+      for (var index = 0; index < widget.itemCount; index++) {
+        if (widget.scrollPositionKeeper!(index) == _firstItemKey) {
+          storedItemIndex = index;
+        }
+      }
+      if (storedItemIndex != null && storedItemIndex > primary.target) {
+        primary.target = storedItemIndex;
       }
     }
   }
 
-  int? _getIndexOfKey(ScrollPositionKeeper scrollPositionKeeper) {
-    for (var index = 0; index < widget.itemCount; index++) {
-      if (scrollPositionKeeper.onItemKey(index) == _lastTargetKey) {
-        return index;
-      }
-    }
-    return null;
-  }
-
-  ValueKey? _lastTargetKey;
+  LocalKey? _firstItemKey;
 
   @override
   Widget build(BuildContext context) {
     /// Collect last target key
     if (widget.itemCount > 0 && widget.scrollPositionKeeper != null) {
-      _lastTargetKey = widget.scrollPositionKeeper!.onItemKey(primary.target);
+      _firstItemKey = widget.scrollPositionKeeper!(0);
     } else {
-      _lastTargetKey = null;
+      _firstItemKey = null;
     }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final cacheExtent = _cacheExtent(constraints);
@@ -381,7 +378,7 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
                       itemBuilder: widget.itemBuilder,
                       separatorBuilder: widget.separatorBuilder,
                       itemCount: widget.itemCount,
-                      positionedIndex: 3,
+                      positionedIndex: primary.target,
                       controller: primary.scrollController,
                       itemPositionsNotifier: primary.itemPositionsNotifier,
                       scrollDirection: widget.scrollDirection,
@@ -412,7 +409,7 @@ class _ScrollablePositionedListState extends State<ScrollablePositionedList>
                         separatorBuilder: widget.separatorBuilder,
                         itemCount: widget.itemCount,
                         itemPositionsNotifier: secondary.itemPositionsNotifier,
-                        positionedIndex: 3,
+                        positionedIndex: primary.target,
                         controller: secondary.scrollController,
                         scrollDirection: widget.scrollDirection,
                         reverse: widget.reverse,
